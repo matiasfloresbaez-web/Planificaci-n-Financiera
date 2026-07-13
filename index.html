@@ -117,15 +117,31 @@
     display:flex; align-items:center; gap:4px;
   }
 
-  .month-tag{
+  /* Month tab bar */
+  .month-tabs{
     display:flex; align-items:center; justify-content:space-between;
-    margin:4px 2px 4px;
+    background:var(--surface);
+    border-radius:14px;
+    box-shadow:var(--shadow);
+    padding:8px 6px;
+    margin:4px 2px 14px;
   }
-  .month-tag span{
-    font-size:13px; color:var(--ink-soft);
+  .month-nav-btn{
+    border:none; background:var(--bg); color:var(--brand-dark);
+    width:36px; height:36px; border-radius:10px;
+    font-size:16px; font-weight:700; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
   }
-  .month-tag .month-name{
-    text-transform:capitalize; font-weight:600; color:var(--ink);
+  .month-nav-btn:active{ transform:scale(0.94); }
+  .month-nav-btn:disabled{ opacity:0.3; cursor:default; }
+  .month-label{
+    flex:1; text-align:center;
+    font-weight:600; font-size:14.5px;
+    text-transform:capitalize;
+  }
+  .month-label .tag{
+    display:block; font-size:11px; font-weight:500; color:var(--ink-soft);
+    text-transform:none; margin-top:1px;
   }
 
   .empty{
@@ -346,7 +362,7 @@
   <div class="summary-row">
     <div class="summary-text">
       <p class="amount" id="totalDisponible">$0</p>
-      <p class="label">Disponible este mes (ingreso − cuotas pendientes)</p>
+      <p class="label" id="dispLabel">Disponible este mes (ingreso − cuotas pendientes)</p>
       <div class="mini-stats">
         <div>Ingreso mensual<b id="totalIngreso">$0</b></div>
         <div>Deuda pendiente<b id="totalPendiente">$0</b></div>
@@ -371,9 +387,13 @@
   <div class="section-head">
     <h2>Deudas</h2>
   </div>
-  <div class="month-tag">
-    <span>Cuotas de <span class="month-name" id="monthName"></span></span>
+
+  <div class="month-tabs">
+    <button class="month-nav-btn" id="prevMonth">‹</button>
+    <div class="month-label" id="monthLabel">—</div>
+    <button class="month-nav-btn" id="nextMonth">›</button>
   </div>
+
   <div id="listArea">
     <div class="loading">Cargando tus deudas…</div>
   </div>
@@ -427,12 +447,19 @@
 
 <script>
 const CLP = n => '$' + Math.round(n).toLocaleString('es-CL');
-const monthKey = () => new Date().toISOString().slice(0,7);
 const monthNames = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-document.getElementById('monthName').textContent = (() => {
-  const d = new Date();
-  return monthNames[d.getMonth()] + ' ' + d.getFullYear();
-})();
+
+const REAL_NOW = new Date();
+let monthOffset = 0; // 0 = mes actual real
+
+function offsetDate(offset){
+  return new Date(REAL_NOW.getFullYear(), REAL_NOW.getMonth() + offset, 1);
+}
+function keyFor(offset){
+  const d = offsetDate(offset);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function displayedMonthKey(){ return keyFor(monthOffset); }
 
 let debts = [];
 let incomes = [];
@@ -440,25 +467,25 @@ let donutChart = null;
 
 function uid(prefix){ return prefix + '_' + Date.now() + '_' + Math.floor(Math.random()*1000); }
 
-async function loadAll(){
+// --- Almacenamiento local (persiste en este navegador/dispositivo, ligado al sitio) ---
+function loadAll(){
   try{
-    const res = await window.storage.get('debts', false);
-    debts = res && res.value ? JSON.parse(res.value) : [];
+    const raw = localStorage.getItem('pf_debts');
+    debts = raw ? JSON.parse(raw) : [];
   }catch(e){ debts = []; }
   try{
-    const res2 = await window.storage.get('incomes', false);
-    incomes = res2 && res2.value ? JSON.parse(res2.value) : [];
+    const raw2 = localStorage.getItem('pf_incomes');
+    incomes = raw2 ? JSON.parse(raw2) : [];
   }catch(e){ incomes = []; }
   render();
 }
-
-async function saveDebts(){
-  try{ await window.storage.set('debts', JSON.stringify(debts), false); }
-  catch(e){ showToast('No se pudo guardar. Intenta de nuevo.'); }
+function saveDebts(){
+  try{ localStorage.setItem('pf_debts', JSON.stringify(debts)); }
+  catch(e){ showToast('No se pudo guardar en este dispositivo.'); }
 }
-async function saveIncomes(){
-  try{ await window.storage.set('incomes', JSON.stringify(incomes), false); }
-  catch(e){ showToast('No se pudo guardar. Intenta de nuevo.'); }
+function saveIncomes(){
+  try{ localStorage.setItem('pf_incomes', JSON.stringify(incomes)); }
+  catch(e){ showToast('No se pudo guardar en este dispositivo.'); }
 }
 
 function showToast(msg){
@@ -495,9 +522,24 @@ function renderIncomes(){
   });
 }
 
+function renderMonthTabs(){
+  const mk = displayedMonthKey();
+  const d = offsetDate(monthOffset);
+  const label = monthNames[d.getMonth()] + ' ' + d.getFullYear();
+  let tag = '';
+  if(monthOffset === 0) tag = 'Mes en curso';
+  else if(monthOffset < 0) tag = 'Mes anterior';
+  else tag = 'Mes futuro';
+  document.getElementById('monthLabel').innerHTML = label + `<span class="tag">${tag}</span>`;
+  document.getElementById('nextMonth').disabled = monthOffset >= 3;
+  document.getElementById('prevMonth').disabled = monthOffset <= -12;
+}
+
 function render(){
   const listArea = document.getElementById('listArea');
-  const mk = monthKey();
+  const mk = displayedMonthKey();
+
+  renderMonthTabs();
 
   if(debts.length === 0){
     listArea.innerHTML = `
@@ -506,26 +548,28 @@ function render(){
         <p>Aún no tienes deudas registradas.<br>Añade la primera para empezar a hacerle seguimiento.</p>
       </div>`;
   } else {
-    listArea.innerHTML = debts.map(d => {
-      const pctPaid = d.total > 0 ? Math.min(100, ((d.total - d.saldo)/d.total)*100) : 100;
-      const paidThisMonth = !!(d.historial && d.historial[mk]);
+    const d = offsetDate(monthOffset);
+    const monthLabelShort = capitalize(monthNames[d.getMonth()]) + ' ' + d.getFullYear();
+    listArea.innerHTML = debts.map(deb => {
+      const pctPaid = deb.total > 0 ? Math.min(100, ((deb.total - deb.saldo)/deb.total)*100) : 100;
+      const paidThisMonth = !!(deb.historial && deb.historial[mk]);
       return `
       <div class="ticket">
         <div class="ticket-body">
           <div class="ticket-head">
-            <h3>${escapeHtml(d.name)}</h3>
-            <button class="del-btn" data-del="${d.id}" title="Eliminar">🗑</button>
+            <h3>${escapeHtml(deb.name)}</h3>
+            <button class="del-btn" data-del="${deb.id}" title="Eliminar">🗑</button>
           </div>
           <div class="ticket-nums">
-            <div>Saldo pendiente<b>${CLP(d.saldo)}</b></div>
-            <div style="text-align:right">Cuota mensual<b>${CLP(d.cuota)}</b></div>
+            <div>Saldo pendiente<b>${CLP(deb.saldo)}</b></div>
+            <div style="text-align:right">Cuota mensual<b>${CLP(deb.cuota)}</b></div>
           </div>
           <div class="progress-track"><div class="progress-fill" style="width:${pctPaid}%"></div></div>
         </div>
         <div class="perforation"></div>
         <div class="stub">
-          <div class="stub-label">Cuota de<b>${capitalize(monthNames[new Date().getMonth()])} ${new Date().getFullYear()}</b></div>
-          <button class="pay-toggle ${paidThisMonth ? 'paid':''}" data-pay="${d.id}">
+          <div class="stub-label">Cuota de<b>${monthLabelShort}</b></div>
+          <button class="pay-toggle ${paidThisMonth ? 'paid':''}" data-pay="${deb.id}">
             ${paidThisMonth ? '✓ Pagada' : 'Marcar pagada'}
           </button>
         </div>
@@ -538,7 +582,6 @@ function render(){
 
   const totalSaldo = debts.reduce((a,d)=>a+d.saldo,0);
   const totalOriginal = debts.reduce((a,d)=>a+d.total,0);
-  const totalPagadoAcum = totalOriginal - totalSaldo;
   const cuotasMesPend = debts.filter(d=> !(d.historial && d.historial[mk]) ).reduce((a,d)=>a + (d.saldo>0? d.cuota:0),0);
   const totalIngresoMensual = incomes.reduce((a,i)=>a+i.amount,0);
   const disponible = totalIngresoMensual - cuotasMesPend;
@@ -546,6 +589,8 @@ function render(){
   document.getElementById('totalPendiente').textContent = CLP(totalSaldo);
   document.getElementById('totalIngreso').textContent = CLP(totalIngresoMensual);
   document.getElementById('totalDisponible').textContent = CLP(disponible);
+  document.getElementById('dispLabel').textContent =
+    (monthOffset === 0 ? 'Disponible este mes' : 'Disponible en ' + monthNames[offsetDate(monthOffset).getMonth()]) + ' (ingreso − cuotas pendientes)';
 
   updateDonut(totalIngresoMensual, cuotasMesPend);
   bindRowEvents();
@@ -587,8 +632,8 @@ function bindRowEvents(){
   });
 }
 
-async function togglePay(id){
-  const mk = monthKey();
+function togglePay(id){
+  const mk = displayedMonthKey();
   const d = debts.find(x=>x.id===id);
   if(!d) return;
   d.historial = d.historial || {};
@@ -601,24 +646,27 @@ async function togglePay(id){
     d.saldo = Math.max(0, d.saldo - d.cuota);
   }
   render();
-  await saveDebts();
+  saveDebts();
 }
 
-async function deleteDebt(id){
+function deleteDebt(id){
   if(!confirm('¿Eliminar esta deuda de tu lista?')) return;
   debts = debts.filter(d=>d.id!==id);
   render();
-  await saveDebts();
+  saveDebts();
   showToast('Deuda eliminada');
 }
 
-async function deleteIncome(id){
+function deleteIncome(id){
   if(!confirm('¿Eliminar este ingreso?')) return;
   incomes = incomes.filter(i=>i.id!==id);
   render();
-  await saveIncomes();
+  saveIncomes();
   showToast('Ingreso eliminado');
 }
+
+document.getElementById('prevMonth').onclick = () => { monthOffset--; render(); };
+document.getElementById('nextMonth').onclick = () => { monthOffset++; render(); };
 
 const overlay = document.getElementById('overlay');
 document.getElementById('openAdd').onclick = () => {
@@ -630,7 +678,7 @@ document.getElementById('openAdd').onclick = () => {
 document.getElementById('btnCancel').onclick = () => overlay.classList.remove('open');
 overlay.addEventListener('click', e=>{ if(e.target === overlay) overlay.classList.remove('open'); });
 
-document.getElementById('btnSave').onclick = async () => {
+document.getElementById('btnSave').onclick = () => {
   const name = document.getElementById('fName').value.trim();
   const total = parseFloat(document.getElementById('fTotal').value);
   const cuota = parseFloat(document.getElementById('fCuota').value);
@@ -642,7 +690,7 @@ document.getElementById('btnSave').onclick = async () => {
   debts.push({ id: uid('d'), name, total, saldo: total, cuota, historial:{} });
   overlay.classList.remove('open');
   render();
-  await saveDebts();
+  saveDebts();
   showToast('Deuda añadida');
 };
 
@@ -655,7 +703,7 @@ document.getElementById('openAddIncome').onclick = () => {
 document.getElementById('btnCancelIncome').onclick = () => overlayIncome.classList.remove('open');
 overlayIncome.addEventListener('click', e=>{ if(e.target === overlayIncome) overlayIncome.classList.remove('open'); });
 
-document.getElementById('btnSaveIncome').onclick = async () => {
+document.getElementById('btnSaveIncome').onclick = () => {
   const name = document.getElementById('iName').value.trim();
   const amount = parseFloat(document.getElementById('iAmount').value);
   if(!name || !amount || amount<=0){
@@ -665,7 +713,7 @@ document.getElementById('btnSaveIncome').onclick = async () => {
   incomes.push({ id: uid('i'), name, amount });
   overlayIncome.classList.remove('open');
   render();
-  await saveIncomes();
+  saveIncomes();
   showToast('Ingreso añadido');
 };
 
