@@ -1,0 +1,15 @@
+{
+  "name": "Planificación Financiera",
+  "short_name": "Fin. Personal",
+  "description": "Control de ingresos y deudas mensuales",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EEF3F2",
+  "theme_color": "#12504D",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

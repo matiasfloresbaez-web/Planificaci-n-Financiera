@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Planificación Financiera</title>
+
+<!-- PWA: instalación en pantalla de inicio -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#12504D">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fin. Personal">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #EEF3F2;
+    --surface: #FFFFFF;
+    --ink: #16262C;
+    --ink-soft: #5B6E73;
+    --brand: #1D7874;
+    --brand-dark: #12504D;
+    --pending: #6247AA;
+    --stamp: #9C3B3B;
+    --gold: #C89B3C;
+    --income: #2E7D32;
+    --line: #DCE4E2;
+    --radius: 18px;
+    --shadow: 0 4px 16px rgba(20,40,45,0.08);
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    min-height:100vh;
+    padding-bottom:110px;
+  }
+  h1,h2,h3, .num{ font-family:'Space Grotesk', sans-serif; }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  header.top{
+    background:linear-gradient(160deg, var(--brand-dark), var(--brand));
+    color:#fff;
+    padding:22px 18px 26px;
+    border-radius:0 0 26px 26px;
+    box-shadow:var(--shadow);
+  }
+  header.top .eyebrow{
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    opacity:0.75;
+    margin:0 0 4px;
+  }
+  header.top h1{
+    font-size:21px;
+    margin:0 0 18px;
+    font-weight:700;
+  }
+  .summary-row{
+    display:flex;
+    align-items:center;
+    gap:16px;
+  }
+  .summary-text{ flex:1; }
+  .summary-text .amount{
+    font-size:28px;
+    font-weight:700;
+    line-height:1.1;
+    margin:0;
+  }
+  .summary-text .label{
+    font-size:12.5px;
+    opacity:0.85;
+    margin:2px 0 10px;
+  }
+  .mini-stats{
+    display:flex;
+    gap:14px;
+    font-size:12px;
+    flex-wrap:wrap;
+  }
+  .mini-stats div{ opacity:0.9; }
+  .mini-stats b{ display:block; font-size:14px; font-family:'IBM Plex Mono',monospace; }
+  .chart-wrap{
+    width:84px; height:84px; flex-shrink:0;
+    position:relative;
+  }
+  #donut{ width:100%; height:100%; }
+  .chart-wrap .pct{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:600;
+    font-family:'Space Grotesk', sans-serif;
+  }
+
+  main{ padding:18px; max-width:520px; margin:0 auto; }
+
+  .section-head{
+    display:flex; align-items:center; justify-content:space-between;
+    margin:22px 2px 12px;
+  }
+  .section-head:first-child{ margin-top:4px; }
+  .section-head h2{ font-size:16px; margin:0; }
+  .add-link{
+    border:none; background:none; cursor:pointer;
+    color:var(--brand); font-weight:600; font-size:13px;
+    font-family:'IBM Plex Sans', sans-serif;
+    display:flex; align-items:center; gap:4px;
+  }
+
+  .month-tag{
+    display:flex; align-items:center; justify-content:space-between;
+    margin:4px 2px 4px;
+  }
+  .month-tag span{
+    font-size:13px; color:var(--ink-soft);
+  }
+  .month-tag .month-name{
+    text-transform:capitalize; font-weight:600; color:var(--ink);
+  }
+
+  .empty{
+    text-align:center;
+    padding:34px 20px;
+    color:var(--ink-soft);
+  }
+  .empty.small{ padding:20px; }
+  .empty .glyph{ font-size:34px; margin-bottom:8px; }
+  .empty p{ margin:6px 0 4px; font-size:14px; }
+
+  .income-card{
+    background:var(--surface);
+    border-radius:14px;
+    box-shadow:var(--shadow);
+    padding:14px 16px;
+    margin-bottom:10px;
+    display:flex; align-items:center; justify-content:space-between;
+    border-left:4px solid var(--income);
+  }
+  .income-card .iname{ font-size:14.5px; font-weight:600; }
+  .income-card .iamount{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600; color:var(--income); font-size:15px;
+  }
+  .income-row-right{ display:flex; align-items:center; gap:10px; }
+
+  .ticket{
+    background:var(--surface);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    margin-bottom:16px;
+    position:relative;
+    overflow:hidden;
+  }
+  .ticket-body{
+    padding:16px 18px 14px;
+  }
+  .ticket-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+  }
+  .ticket-head h3{
+    font-size:16px;
+    margin:0;
+    font-weight:600;
+  }
+  .del-btn{
+    background:none; border:none; cursor:pointer;
+    color:var(--ink-soft); font-size:16px;
+    padding:2px 4px; line-height:1; opacity:0.55;
+    transition:opacity .15s;
+  }
+  .del-btn:hover{ opacity:1; color:var(--stamp); }
+
+  .ticket-nums{
+    display:flex; justify-content:space-between;
+    margin-top:10px; font-size:12.5px; color:var(--ink-soft);
+  }
+  .ticket-nums b{
+    display:block; font-family:'IBM Plex Mono',monospace;
+    font-size:15px; color:var(--ink); font-weight:600; margin-top:1px;
+  }
+
+  .progress-track{
+    height:6px; border-radius:6px; background:var(--line);
+    margin-top:12px; overflow:hidden;
+  }
+  .progress-fill{
+    height:100%; border-radius:6px;
+    background:linear-gradient(90deg, var(--brand), var(--gold));
+    transition:width .35s ease;
+  }
+
+  .perforation{
+    position:relative;
+    height:0;
+    border-top:2px dashed var(--line);
+    margin:14px 0 0;
+  }
+  .perforation::before, .perforation::after{
+    content:"";
+    position:absolute; top:-9px;
+    width:18px; height:18px; border-radius:50%;
+    background:var(--bg);
+  }
+  .perforation::before{ left:-27px; }
+  .perforation::after{ right:-27px; }
+
+  .stub{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 18px 14px;
+  }
+  .stub-label{ font-size:13px; color:var(--ink-soft); }
+  .stub-label b{ display:block; color:var(--ink); font-size:13.5px; font-weight:600;}
+
+  .pay-toggle{
+    display:flex; align-items:center; gap:8px;
+    border:1.5px solid var(--brand);
+    color:var(--brand);
+    background:#fff;
+    padding:8px 14px;
+    border-radius:999px;
+    font-size:13px; font-weight:600;
+    cursor:pointer;
+    font-family:'IBM Plex Sans', sans-serif;
+    transition: all .15s;
+  }
+  .pay-toggle.paid{
+    background:var(--brand);
+    color:#fff;
+  }
+  .pay-toggle:active{ transform:scale(0.97); }
+
+  .stamp{
+    position:absolute;
+    top:14px; right:-6px;
+    transform:rotate(-14deg);
+    border:3px solid var(--stamp);
+    color:var(--stamp);
+    padding:3px 10px;
+    border-radius:8px;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:12.5px;
+    letter-spacing:0.05em;
+    opacity:0.9;
+    pointer-events:none;
+  }
+
+  .del-mini{
+    background:none; border:none; cursor:pointer; opacity:0.4;
+    font-size:14px; color:var(--ink-soft);
+  }
+  .del-mini:hover{ opacity:1; color:var(--stamp); }
+
+  .fab{
+    position:fixed;
+    bottom:24px; left:50%; transform:translateX(-50%);
+    background:var(--brand-dark);
+    color:#fff;
+    border:none;
+    padding:14px 26px;
+    border-radius:999px;
+    font-size:14.5px;
+    font-weight:600;
+    font-family:'IBM Plex Sans', sans-serif;
+    box-shadow:0 6px 18px rgba(18,80,77,0.35);
+    cursor:pointer;
+    display:flex; align-items:center; gap:8px;
+  }
+  .fab:active{ transform:translateX(-50%) scale(0.97); }
+
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(15,25,28,0.45);
+    display:flex; align-items:flex-end;
+    z-index:20;
+    opacity:0; pointer-events:none;
+    transition:opacity .2s;
+  }
+  .overlay.open{ opacity:1; pointer-events:auto; }
+  .sheet{
+    background:var(--surface);
+    width:100%;
+    border-radius:24px 24px 0 0;
+    padding:22px 20px 26px;
+    transform:translateY(20px);
+    transition:transform .2s;
+  }
+  .overlay.open .sheet{ transform:translateY(0); }
+  .sheet h2{ margin:0 0 16px; font-size:18px; }
+  .field{ margin-bottom:14px; }
+  .field label{
+    display:block; font-size:12.5px; color:var(--ink-soft);
+    margin-bottom:5px; font-weight:500;
+  }
+  .field input{
+    width:100%;
+    padding:12px 14px;
+    border-radius:12px;
+    border:1.5px solid var(--line);
+    font-size:15px;
+    font-family:'IBM Plex Mono', monospace;
+    background:#FBFCFC;
+  }
+  .field input:focus{ outline:2px solid var(--brand); border-color:var(--brand); }
+  .field input[type="text"]{ font-family:'IBM Plex Sans', sans-serif; }
+  .sheet-actions{ display:flex; gap:10px; margin-top:6px; }
+  .sheet-actions button{
+    flex:1; padding:13px; border-radius:12px; border:none;
+    font-size:14.5px; font-weight:600; cursor:pointer;
+    font-family:'IBM Plex Sans', sans-serif;
+  }
+  .btn-cancel{ background:var(--line); color:var(--ink-soft); }
+  .btn-save{ background:var(--brand); color:#fff; }
+  .btn-save.income{ background:var(--income); }
+
+  .toast{
+    position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff;
+    padding:9px 18px; border-radius:999px;
+    font-size:13px; opacity:0; transition:opacity .25s;
+    pointer-events:none; z-index:30;
+  }
+  .toast.show{ opacity:0.95; }
+
+  .loading{ text-align:center; padding:40px 20px; color:var(--ink-soft); font-size:14px; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <p class="eyebrow">Control mensual</p>
+  <h1>Planificación Financiera</h1>
+  <div class="summary-row">
+    <div class="summary-text">
+      <p class="amount" id="totalDisponible">$0</p>
+      <p class="label">Disponible este mes (ingreso − cuotas pendientes)</p>
+      <div class="mini-stats">
+        <div>Ingreso mensual<b id="totalIngreso">$0</b></div>
+        <div>Deuda pendiente<b id="totalPendiente">$0</b></div>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="donut"></canvas>
+      <div class="pct" id="donutPct">0%</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="section-head">
+    <h2>Ingresos</h2>
+    <button class="add-link" id="openAddIncome">+ Añadir ingreso</button>
+  </div>
+  <div id="incomeArea">
+    <div class="loading">Cargando…</div>
+  </div>
+
+  <div class="section-head">
+    <h2>Deudas</h2>
+  </div>
+  <div class="month-tag">
+    <span>Cuotas de <span class="month-name" id="monthName"></span></span>
+  </div>
+  <div id="listArea">
+    <div class="loading">Cargando tus deudas…</div>
+  </div>
+</main>
+
+<button class="fab" id="openAdd">
+  <span style="font-size:18px; line-height:0;">+</span> Añadir deuda
+</button>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <h2 id="sheetTitle">Nueva deuda</h2>
+    <div class="field">
+      <label>Nombre de la deuda</label>
+      <input type="text" id="fName" placeholder="Ej: Tarjeta Falabella">
+    </div>
+    <div class="field">
+      <label>Monto total de la deuda</label>
+      <input type="number" id="fTotal" placeholder="Ej: 450000" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>Cuota mensual</label>
+      <input type="number" id="fCuota" placeholder="Ej: 35000" inputmode="numeric">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-cancel" id="btnCancel">Cancelar</button>
+      <button class="btn-save" id="btnSave">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlayIncome">
+  <div class="sheet">
+    <h2>Nuevo ingreso</h2>
+    <div class="field">
+      <label>Origen (ej: Sueldo, Bono, Clases particulares)</label>
+      <input type="text" id="iName" placeholder="Ej: Sueldo Ejército">
+    </div>
+    <div class="field">
+      <label>Monto mensual</label>
+      <input type="number" id="iAmount" placeholder="Ej: 900000" inputmode="numeric">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-cancel" id="btnCancelIncome">Cancelar</button>
+      <button class="btn-save income" id="btnSaveIncome">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CLP = n => '$' + Math.round(n).toLocaleString('es-CL');
+const monthKey = () => new Date().toISOString().slice(0,7);
+const monthNames = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+document.getElementById('monthName').textContent = (() => {
+  const d = new Date();
+  return monthNames[d.getMonth()] + ' ' + d.getFullYear();
+})();
+
+let debts = [];
+let incomes = [];
+let donutChart = null;
+
+function uid(prefix){ return prefix + '_' + Date.now() + '_' + Math.floor(Math.random()*1000); }
+
+async function loadAll(){
+  try{
+    const res = await window.storage.get('debts', false);
+    debts = res && res.value ? JSON.parse(res.value) : [];
+  }catch(e){ debts = []; }
+  try{
+    const res2 = await window.storage.get('incomes', false);
+    incomes = res2 && res2.value ? JSON.parse(res2.value) : [];
+  }catch(e){ incomes = []; }
+  render();
+}
+
+async function saveDebts(){
+  try{ await window.storage.set('debts', JSON.stringify(debts), false); }
+  catch(e){ showToast('No se pudo guardar. Intenta de nuevo.'); }
+}
+async function saveIncomes(){
+  try{ await window.storage.set('incomes', JSON.stringify(incomes), false); }
+  catch(e){ showToast('No se pudo guardar. Intenta de nuevo.'); }
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 1800);
+}
+
+function escapeHtml(s){
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+function capitalize(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+function renderIncomes(){
+  const area = document.getElementById('incomeArea');
+  if(incomes.length === 0){
+    area.innerHTML = '<div class="empty small"><div class="glyph">💵</div><p>Aún no registras ingresos. Añade tu sueldo u otras entradas de dinero.</p></div>';
+    return;
+  }
+  area.innerHTML = incomes.map(i => `
+    <div class="income-card">
+      <div class="iname">${escapeHtml(i.name)}</div>
+      <div class="income-row-right">
+        <div class="iamount">${CLP(i.amount)}</div>
+        <button class="del-mini" data-delinc="${i.id}" title="Eliminar">🗑</button>
+      </div>
+    </div>
+  `).join('');
+  document.querySelectorAll('[data-delinc]').forEach(btn=>{
+    btn.onclick = () => deleteIncome(btn.getAttribute('data-delinc'));
+  });
+}
+
+function render(){
+  const listArea = document.getElementById('listArea');
+  const mk = monthKey();
+
+  if(debts.length === 0){
+    listArea.innerHTML = `
+      <div class="empty">
+        <div class="glyph">🎟️</div>
+        <p>Aún no tienes deudas registradas.<br>Añade la primera para empezar a hacerle seguimiento.</p>
+      </div>`;
+  } else {
+    listArea.innerHTML = debts.map(d => {
+      const pctPaid = d.total > 0 ? Math.min(100, ((d.total - d.saldo)/d.total)*100) : 100;
+      const paidThisMonth = !!(d.historial && d.historial[mk]);
+      return `
+      <div class="ticket">
+        <div class="ticket-body">
+          <div class="ticket-head">
+            <h3>${escapeHtml(d.name)}</h3>
+            <button class="del-btn" data-del="${d.id}" title="Eliminar">🗑</button>
+          </div>
+          <div class="ticket-nums">
+            <div>Saldo pendiente<b>${CLP(d.saldo)}</b></div>
+            <div style="text-align:right">Cuota mensual<b>${CLP(d.cuota)}</b></div>
+          </div>
+          <div class="progress-track"><div class="progress-fill" style="width:${pctPaid}%"></div></div>
+        </div>
+        <div class="perforation"></div>
+        <div class="stub">
+          <div class="stub-label">Cuota de<b>${capitalize(monthNames[new Date().getMonth()])} ${new Date().getFullYear()}</b></div>
+          <button class="pay-toggle ${paidThisMonth ? 'paid':''}" data-pay="${d.id}">
+            ${paidThisMonth ? '✓ Pagada' : 'Marcar pagada'}
+          </button>
+        </div>
+        ${paidThisMonth ? '<div class="stamp">PAGADO</div>' : ''}
+      </div>`;
+    }).join('');
+  }
+
+  renderIncomes();
+
+  const totalSaldo = debts.reduce((a,d)=>a+d.saldo,0);
+  const totalOriginal = debts.reduce((a,d)=>a+d.total,0);
+  const totalPagadoAcum = totalOriginal - totalSaldo;
+  const cuotasMesPend = debts.filter(d=> !(d.historial && d.historial[mk]) ).reduce((a,d)=>a + (d.saldo>0? d.cuota:0),0);
+  const totalIngresoMensual = incomes.reduce((a,i)=>a+i.amount,0);
+  const disponible = totalIngresoMensual - cuotasMesPend;
+
+  document.getElementById('totalPendiente').textContent = CLP(totalSaldo);
+  document.getElementById('totalIngreso').textContent = CLP(totalIngresoMensual);
+  document.getElementById('totalDisponible').textContent = CLP(disponible);
+
+  updateDonut(totalIngresoMensual, cuotasMesPend);
+  bindRowEvents();
+}
+
+function updateDonut(ingreso, cuotasMes){
+  const ctx = document.getElementById('donut');
+  const usado = Math.min(cuotasMes, ingreso > 0 ? ingreso : cuotasMes);
+  const libre = Math.max(0, ingreso - cuotasMes);
+  const pct = ingreso > 0 ? Math.round((libre/ingreso)*100) : 0;
+  document.getElementById('donutPct').textContent = pct + '%';
+
+  const data = ingreso > 0 ? [libre, usado] : [0,1];
+  const colors = ingreso > 0 ? ['#C89B3C', 'rgba(255,255,255,0.25)'] : ['rgba(255,255,255,0.15)','rgba(255,255,255,0.08)'];
+
+  if(donutChart){
+    donutChart.data.datasets[0].data = data;
+    donutChart.data.datasets[0].backgroundColor = colors;
+    donutChart.update();
+  } else {
+    donutChart = new Chart(ctx, {
+      type:'doughnut',
+      data:{ labels:['Disponible','Comprometido en cuotas'], datasets:[{ data, backgroundColor:colors, borderWidth:0 }] },
+      options:{
+        cutout:'72%',
+        plugins:{ legend:{display:false}, tooltip:{enabled:false} },
+        animation:{ duration:400 }
+      }
+    });
+  }
+}
+
+function bindRowEvents(){
+  document.querySelectorAll('[data-pay]').forEach(btn=>{
+    btn.onclick = () => togglePay(btn.getAttribute('data-pay'));
+  });
+  document.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.onclick = () => deleteDebt(btn.getAttribute('data-del'));
+  });
+}
+
+async function togglePay(id){
+  const mk = monthKey();
+  const d = debts.find(x=>x.id===id);
+  if(!d) return;
+  d.historial = d.historial || {};
+  const already = !!d.historial[mk];
+  if(already){
+    delete d.historial[mk];
+    d.saldo = Math.min(d.total, d.saldo + d.cuota);
+  } else {
+    d.historial[mk] = true;
+    d.saldo = Math.max(0, d.saldo - d.cuota);
+  }
+  render();
+  await saveDebts();
+}
+
+async function deleteDebt(id){
+  if(!confirm('¿Eliminar esta deuda de tu lista?')) return;
+  debts = debts.filter(d=>d.id!==id);
+  render();
+  await saveDebts();
+  showToast('Deuda eliminada');
+}
+
+async function deleteIncome(id){
+  if(!confirm('¿Eliminar este ingreso?')) return;
+  incomes = incomes.filter(i=>i.id!==id);
+  render();
+  await saveIncomes();
+  showToast('Ingreso eliminado');
+}
+
+const overlay = document.getElementById('overlay');
+document.getElementById('openAdd').onclick = () => {
+  document.getElementById('fName').value='';
+  document.getElementById('fTotal').value='';
+  document.getElementById('fCuota').value='';
+  overlay.classList.add('open');
+};
+document.getElementById('btnCancel').onclick = () => overlay.classList.remove('open');
+overlay.addEventListener('click', e=>{ if(e.target === overlay) overlay.classList.remove('open'); });
+
+document.getElementById('btnSave').onclick = async () => {
+  const name = document.getElementById('fName').value.trim();
+  const total = parseFloat(document.getElementById('fTotal').value);
+  const cuota = parseFloat(document.getElementById('fCuota').value);
+
+  if(!name || !total || !cuota || total<=0 || cuota<=0){
+    showToast('Completa todos los campos con valores válidos');
+    return;
+  }
+  debts.push({ id: uid('d'), name, total, saldo: total, cuota, historial:{} });
+  overlay.classList.remove('open');
+  render();
+  await saveDebts();
+  showToast('Deuda añadida');
+};
+
+const overlayIncome = document.getElementById('overlayIncome');
+document.getElementById('openAddIncome').onclick = () => {
+  document.getElementById('iName').value='';
+  document.getElementById('iAmount').value='';
+  overlayIncome.classList.add('open');
+};
+document.getElementById('btnCancelIncome').onclick = () => overlayIncome.classList.remove('open');
+overlayIncome.addEventListener('click', e=>{ if(e.target === overlayIncome) overlayIncome.classList.remove('open'); });
+
+document.getElementById('btnSaveIncome').onclick = async () => {
+  const name = document.getElementById('iName').value.trim();
+  const amount = parseFloat(document.getElementById('iAmount').value);
+  if(!name || !amount || amount<=0){
+    showToast('Completa el origen y un monto válido');
+    return;
+  }
+  incomes.push({ id: uid('i'), name, amount });
+  overlayIncome.classList.remove('open');
+  render();
+  await saveIncomes();
+  showToast('Ingreso añadido');
+};
+
+loadAll();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
