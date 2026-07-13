@@ -1,4 +1,4 @@
-const CACHE_NAME = "planificacion-financiera-v1";
+const CACHE_NAME = "planificacion-financiera-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -23,10 +23,22 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// Network-first para HTML (para que las actualizaciones se vean de inmediato),
+// cache-first para el resto (para que funcione offline).
 self.addEventListener("fetch", (event) => {
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).catch(() => cached);
-    })
-  );
+  const isHTML = event.request.mode === "navigate" || event.request.destination === "document";
+  if (isHTML) {
+    event.respondWith(
+      fetch(event.request)
+        .then((res) => {
+          caches.open(CACHE_NAME).then((c) => c.put(event.request, res.clone()));
+          return res;
+        })
+        .catch(() => caches.match(event.request))
+    );
+  } else {
+    event.respondWith(
+      caches.match(event.request).then((cached) => cached || fetch(event.request))
+    );
+  }
 });
